@@ -3835,13 +3835,18 @@ int main(int argc, char *argv[]) {
     SetConsoleOutputCP(65001);
 
     if (argc < 2) {
-        cerr << "Usage: mmn <filename>.thl [target.json]" << endl;
+        cerr << "Usage: mmn <filename>.thl [target.json]\nor mmn <filename>.thl" << endl;
         exit(1);
     }
 
     string filename = argv[1];
     string fileTarget;  // กำหนดค่าว่างก่อน
 
+    // เช็คกรณี version command
+    if (filename == "-v" || filename == "-version") {
+        cout << "mmt version 1.0 Runes of Thai" << endl;
+        return 0;
+    }
     if (argc >= 3) {
         fileTarget = argv[2];
     }
@@ -3860,11 +3865,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    // เช็คกรณี version command
-    if (filename == "-v" || filename == "-version") {
-        cout << "mmt version 1.0 Runes of Thai" << endl;
-        return 0;
-    }
 
     // กรณีมี fileTarget ให้ตรวจสอบนามสกุลต้องเป็น .json เท่านั้น
     if (!fileTarget.empty()) {
