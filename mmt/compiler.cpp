@@ -3830,6 +3830,18 @@ string ast_json(string content){
 			string ast_json = ast->print();
 			return ast_json;
 }
+std::string sanitize_for_json(const std::string& input) {
+    std::string output;
+    for (char c : input) {
+        switch (c) {
+            case '\r': output += "\\r"; break;
+            case '\n': output += "\\n"; break;
+            case '\t': output += "\\t"; break;
+            default:   output += c;
+        }
+    }
+    return output;
+}
 
 int main(int argc, char *argv[]) {
     SetConsoleOutputCP(65001);
@@ -3905,7 +3917,7 @@ int main(int argc, char *argv[]) {
         string astText = ast_json(content);
 
         if (fileTarget.empty()) {
-
+			astText = sanitize_for_json(astText);
             json jsonWork = json::parse(astText);
             evalProgram(jsonWork);
 
