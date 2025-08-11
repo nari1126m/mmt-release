@@ -158,7 +158,9 @@ bool getBool(Value val) {
 
 EnvStruct *lookvar(const string &name, int line, int column) {
 	for (int i = env.size() - 1; i >= 0; i--) {
+	
 		if (env[i].count(name)) {
+
 			return &env[i][name];
 		}
 
@@ -168,46 +170,50 @@ EnvStruct *lookvar(const string &name, int line, int column) {
 	exit(1);
 }
 Value getVar(const string &name, int line, int column) {
-	for (auto enV = env.rbegin(); enV != env.rend(); ++enV) {
-		if (enV->count(name)) {
-			return (*enV)[name].value;
-		}
-	}
-
-	cerr << "ไม่พบตัวแปร" << name << "ในขอบเขตนี้ ที่บรรทัด " << line << "คอลัม์"
-		 << column << endl;
-	exit(1);
+    int scopeIndex = (int)env.size() - 1;  // เริ่มที่ scope สุดท้าย
+    for (auto enV = env.rbegin(); enV != env.rend(); ++enV, --scopeIndex) {
+       
+        if (enV->count(name)) {
+            return (*enV)[name].value;
+        }
+    }
+    cerr << "ไม่พบตัวแปร " << name << " ในขอบเขตนี้ ที่บรรทัด " << line << " คอลัมน์ " << column << endl;
+    exit(1);
 }
 
 
 
-void declare(const string &name, Value val, const bool &isConst, int line,
-			 int column) {
 
-	if (env.back().count(name)) {
-		cerr << "มีการประกาศตัวแปร" << name << "แล้วในขอบเขตนี้ ที่บรรทัด " << line
-			 << "คอลัม์" << column << endl;
-		exit(1);
-	}
-	env.back()[name] = {val, isConst};
+void declare(const string &name, Value val, const bool &isConst, int line, int column) {
+    if (env.back().count(name)) {
+        cerr << "มีการประกาศตัวแปร " << name << " แล้วในขอบเขตนี้ ที่บรรทัด " << line
+             << " คอลัมน์ " << column << endl;
+        exit(1);
+    }
+    env.back()[name] = {val, isConst};
 }
 
 
 void setvar(const string &name, Value val, int line, int column) {
-	EnvStruct *entry = lookvar(name, 0, 0);
-	if (entry->isConst == true) {
-		cerr << "ไม่สามารถกำหนดค่าคงที่" << name << "ได้ ที่บรรทัด " << line
-				 << "คอลัมน์" << column << endl;
-		std::exit(1);
-	}
-	for (int i = env.size() - 1; i >= 0; i--) {
-		if (!env[i].count(name)) {
-			cerr << "ไม่พบตัวแปร " << name << " ในขอบเขตนี้ ที่บรรทัด " << line
-				 << "คอลัมน์" << column << endl;
-		}
-	}
-	entry->value = val;
+    EnvStruct *entry = lookvar(name, 0, 0);
+    if (entry->isConst == true) {
+        cerr << "ไม่สามารถกำหนดค่าคงที่" << name << "ได้ ที่บรรทัด " << line
+             << " คอลัมน์ " << column << endl;
+        std::exit(1);
+    }
+    // หาตำแหน่งตัวแปรใน scope ที่อยู่ลึกสุดที่เจอชื่อ name
+    for (int i = env.size() - 1; i >= 0; i--) {
+        if (env[i].count(name)) {
+            env[i][name].value = val;  // อัปเดตค่าตัวแปร
+            return;
+        }
+    }
+    // ถ้าไม่เจอเลย
+    cerr << "ไม่พบตัวแปร " << name << " ในขอบเขตนี้ ที่บรรทัด " << line
+         << " คอลัมน์ " << column << endl;
+    exit(1);
 }
+
 
 // evalExper
 // shared_ptr<ASTNode> parseFunctionFromJSON(const json &j);
@@ -1176,36 +1182,47 @@ Value evalStatement(const json &stmt) {
 			}
 		} while (getBool(evalExpr(stmt["condition"])));
 		return nullptr;
-	} else if (type == "forloop") {
-		evalStatement(stmt["initialization"]);
-		while (getBool(evalExpr(stmt["condition"]))) {
-			try {
-				// ทำซ้ำ block
-				const json &body = stmt["body"];
-				if (body["type"] == "block") {
-					for (const auto &s : body["statements"]) {
-						evalStatement(s);
-					}
-				} else {
-					evalStatement(body);
-				}
-			} catch (const ContinueException &) {
-				// ข้ามไปยังรอบถัดไป
-				continue;
-			} catch (const BreakException &) {
-				// ออกจากลูป
-				break;
-			}
+	}else if (type == "forloop") {
+    // scope สำหรับ initialization และตัวแปรของลูป
+    env.push_back({});
 
-			if (stmt["changevalue"]["type"] == "unaryOp") {
-				evalExpr(stmt["changevalue"]);
-			} else {
-				evalStatement(stmt["changevalue"]);
-			}
-		}
-		return nullptr;
+    evalStatement(stmt["initialization"]);
 
-	} else if (type == "return") {
+
+    while (getBool(evalExpr(stmt["condition"]))) {
+        try {
+
+            // ✅ สร้าง scope ใหม่ให้ body ทุกครั้ง
+            env.push_back({});
+
+            const json &body = stmt["body"];
+            if (body["type"] == "block") {
+                for (const auto &s : body["statements"]) {
+                    evalStatement(s);
+                }
+            } else {
+                evalStatement(body);
+            }
+
+            // ✅ ลบ scope ของ body ออกเมื่อจบรอบ
+            env.pop_back();
+
+        } catch (const ContinueException &) {
+            env.pop_back(); // ลบ scope body ก่อน continue
+            continue;
+        } catch (const BreakException &) {
+            env.pop_back(); // ลบ scope body ก่อน break
+            break;
+        }
+
+        evalStatement(stmt["changevalue"]);
+    }
+
+    env.pop_back();
+
+    return nullptr;
+}
+ else if (type == "return") {
 		Value val = evalExpr(stmt["value"]);
 		throw ReturnException(val);
 		return nullptr;
@@ -1462,7 +1479,7 @@ else if(type == "Comment"){
         return evalExpr(stmt);  // คืนค่าที่ evalExpr คืนกลับมาเลย
     }
 
-	cerr << "ไม่รู้จักคำสั่งประเภทนี้: " << stmt["value"]<<" ประเภท: "<<type << " ที่บรรทัด "<<stmt["line"]<<" คอลัมน์ "<<stmt["column"]<< endl;
+	cerr << "ไม่รู้จักคำสั่งประเภทนี้ "<<" ที่บรรทัด "<<stmt["line"]<<" คอลัมน์ "<<stmt["column"]<< endl;
 	exit(1);
 	// bracket below refer to evalStatement
 }
@@ -3091,7 +3108,7 @@ public:
 		if (peek().type == "DECLARE") {
 			Token t = peek();
 					if (!match("DECLARE")) {
-						syntaxError(peek(),"ขาด กำหนด ในการกำหนดตัวแปร");
+						syntaxError(peek(),"ขาด ให้ ในการกำหนดตัวแปร");
 					}
 
 					if (peek().type !="IDENTIFIER") {
@@ -3337,7 +3354,7 @@ public:
 			//pramas.push_back(parseVariableDecleartion());
 			Token t = peek();
 			if (!match("DECLARE")) {
-				syntaxError(peek(),"ขาด กำหนด ในการกำหนดพารามิเตอร์");
+				syntaxError(peek(),"ขาด ให้ ในการกำหนดพารามิเตอร์");
 			}
 			if (peek().type !=
 				"IDENTIFIER") {
@@ -3847,7 +3864,7 @@ int main(int argc, char *argv[]) {
     SetConsoleOutputCP(65001);
 
     if (argc < 2) {
-        cerr << "Usage: mmn <filename>.thl [target.json]\nor mmn <filename>.thl" << endl;
+        cerr << "Usage: mmt <filename>.thl [target.json]\nor mmt <filename>.thl" << endl;
         exit(1);
     }
 
