@@ -1143,7 +1143,10 @@ Value evalStatement(const json &stmt) {
 	} else if (type == "whileloop") {
 		while (getBool(evalExpr(stmt["condition"]))) {
 			try {
+
 				 env.push_back({});
+
+
 				// ทำซ้ำ block
 				const json &body = stmt["body"];
 				if (body["type"] == "block") {
@@ -1153,7 +1156,10 @@ Value evalStatement(const json &stmt) {
 				} else {
 					evalStatement(body);
 				}
+
 				env.pop_back();
+
+
 			} catch (const ContinueException &) {
 				// ข้ามไปยังรอบถัดไป
 				continue;
@@ -1166,7 +1172,10 @@ Value evalStatement(const json &stmt) {
 	} else if (type == "dowhileloop") {
 		do {
 			try {
+
 				env.push_back({});
+
+
 				// ทำซ้ำ block
 				const json &body = stmt["body"];
 				if (body["type"] == "block") {
@@ -1176,7 +1185,10 @@ Value evalStatement(const json &stmt) {
 				} else {
 					evalStatement(body);
 				}
+
 				env.pop_back();
+
+
 			} catch (const ContinueException &) {
 				// ข้ามไปยังรอบถัดไป
 				continue;
@@ -3186,8 +3198,10 @@ public:
 		Token t = peek();
 
 		if (!match("WHILE")) {
+
 			syntaxError(peek(), "ขาด คำสั่ง ขณะ");
 		}
+
 
 		if (!match("OPEN_PAREN")) {
 			syntaxError(peek(), "ขาด ( ที่ ขณะ");
@@ -3216,11 +3230,13 @@ public:
 	ASTNodePtr parseDoWhile() {
 		Token t = peek();
 		if (!match("DO")) {
+
 			syntaxError(peek(), "ไม่พบ ทำ ใน ทำ..ขณะ");
 		}
 
 		if (!match("OPEN_BRACKETS")) {
 			syntaxError(peek(), "ไม่พบ { ใน ทำ..ขณะ");
+
 		}
 		vector<ASTNodePtr> body;
 		while (peek().type != "CLOSE_BRACKETS" &&
@@ -3229,6 +3245,7 @@ public:
 			body.push_back(parseStatement());
 		}
 		if (!match("CLOSE_BRACKETS")) {
+
 			syntaxError(peek(), "ไม่พบ } ใน ทำ..ขณะ");
 		}
 		if (!match("WHILE")) {
@@ -3236,6 +3253,14 @@ public:
 		}
 		if (!match("OPEN_PAREN")) {
 			syntaxError(peek(), "ไม่พบ ( ใน ทำ..ขณะ");
+
+		}
+		if (!match("WHILE")) {
+			syntaxError(peek(), "ไม่พบ ขณะ ใน ทำ..ขณะ");
+		}
+		if (!match("OPEN_PAREN")) {
+			syntaxError(peek(), "ไม่พบ ( ใน ทำ..ขณะ");
+
 		}
 		ASTNodePtr cond = nullptr;
 		if (peek().type != "CLOSE_PAREN" &&
@@ -3243,7 +3268,9 @@ public:
 			cond = parseExpression();
 		}
 		if (!match("CLOSE_PAREN")) {
+
 			syntaxError(peek(), "ไม่พบ ) ใน ทำ..ขณะ");
+
 		}
 		return make_shared<DoWhileNode>(cond, body, t);
 	}
